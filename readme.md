@@ -17,6 +17,12 @@ play YOUTUBE_VIDEO_URL
 stop
 ```
 
+## Requirements
+
+Requires youtube-dl and ffmpeg to be installed on the system and accessible for this program.
+
+Protip: using yt-dlp also works but it needs to be renamed to youtube-dl.
+
 ## Permissions
 
 The bot requires to have message content intent permission which can be enabled from discord bot developer portal.
