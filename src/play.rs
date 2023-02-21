@@ -6,9 +6,19 @@ use url::Url;
 pub async fn play(ctx: &Context, msg: &Message) {
     let url = msg.content.replace("play", "").trim().to_string();
 
-    log::info!("playing youtube video {}", url);
-
-    let url = Url::parse(&url).unwrap();
+    let url = match Url::parse(&url) {
+        Ok(url) => url,
+        Err(why) => {
+            log::error!("Error parsing url: {:?}", why);
+            
+            match msg.reply(ctx, "Nigga please write correct url").await {
+                Ok(_) => {},
+                Err(why) => log::error!("Error sending message: {:?}", why),
+            }
+            
+            return;
+        }
+    };
 
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;

@@ -47,16 +47,41 @@ async fn main() {
 
     let args = Args::parse();
 
-    let framework = StandardFramework::new()
+    loop {
+        log::info!("building client...");
+
+        let framework = StandardFramework::new()
         .configure(|c| c.with_whitespace(true).prefix("cringe"));
 
-    let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
+        let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
 
-    let mut client = Client::builder(args.token, intents)
-        .framework(framework)
-        .register_songbird()
-        .event_handler(Handler)
-        .await.unwrap();
+        let mut client = match Client::builder(&args.token, intents)
+            .framework(framework)
+            .register_songbird()
+            .event_handler(Handler)
+            .await {
+            Ok(client) => client,
+            Err(why) => {
+                log::error!("Error creating client: {:?}", why);
 
-    client.start().await.unwrap();
+                log::info!("retrying in 5 seconds...");
+            
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                continue;
+            }
+        };
+
+        match client.start().await {
+            Ok(_) => {
+                break;
+            }
+            Err(why) => {
+                log::error!("client error: {:?}", why);
+
+                log::info!("retrying in 5 seconds...");
+                
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            }
+        }
+    }
 }
