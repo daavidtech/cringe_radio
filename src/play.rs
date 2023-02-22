@@ -20,6 +20,8 @@ pub async fn play(ctx: &Context, msg: &Message) {
         }
     };
 
+    log::info!("url parsed successfully");
+
     let guild = msg.guild(&ctx.cache).unwrap();
     let guild_id = guild.id;
 
@@ -39,18 +41,30 @@ pub async fn play(ctx: &Context, msg: &Message) {
         }
     };
 
+    log::info!("user is connected to channel");
+
     let manager = songbird::get(ctx).await
         .expect("Songbird Voice client placed in at initialisation.").clone();
+
+    log::info!("songbird manager found");
 
     let _handler = manager.join(guild_id, connect_to).await;
 
     if let Some(handler_lock) = manager.get(guild_id) {
+        log::info!("trying to lock manager...");
+
         let mut handler = handler_lock.lock().await;
+
+        log::info!("manager successfully acquired");
 
         let source = songbird::ytdl(url)
             .await
             .expect("Songbird ytdl failed");
 
+        log::info!("playing source...");
+
         handler.play_source(source);
+
+        log::info!("source played successfully");
     }
 }
