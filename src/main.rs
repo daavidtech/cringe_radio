@@ -43,7 +43,10 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .filter_module("tracing::span", log::LevelFilter::Error)
+        .init();
 
     let args = Args::parse();
 
