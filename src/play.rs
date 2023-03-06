@@ -57,9 +57,19 @@ pub async fn play(ctx: &Context, msg: &Message) {
 
         log::info!("manager successfully acquired");
 
-        let source = songbird::ytdl(url)
-            .await
-            .expect("Songbird ytdl failed");
+        let source = match songbird::ytdl(url).await {
+            Ok(source) => source,
+            Err(why) => {
+                log::error!("Error creating source: {:?}", why);
+
+                match msg.reply(ctx, "Error creating source").await {
+                    Ok(_) => {},
+                    Err(why) => log::error!("Error sending message: {:?}", why),
+                }
+
+                return;
+            }
+        };
 
         log::info!("playing source...");
 
