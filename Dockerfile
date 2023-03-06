@@ -10,6 +10,6 @@ WORKDIR /usr/src/cringe_radio
 
 COPY . .
 
-RUN cargo install --path .
+RUN cargo build --release
 
-CMD ["cringe_radio"]
+CMD ["./target/release/cringe_radio"]
