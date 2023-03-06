@@ -50,6 +50,23 @@ async fn main() {
 
     let args = Args::parse();
 
+    let token = match std::env::var("CRINGE_RADIO_TOKEN") {
+        Ok(t) => {
+            t
+        }
+        Err(_) => {
+            match args.token {
+                Some(t) => {
+                    t
+                }
+                None => {
+                    log::error!("No token provided");
+                    return;
+                }
+            }
+        }
+    };
+
     loop {
         log::info!("building client...");
 
@@ -58,7 +75,7 @@ async fn main() {
 
         let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
 
-        let mut client = match Client::builder(&args.token, intents)
+        let mut client = match Client::builder(&token, intents)
             .framework(framework)
             .register_songbird()
             .event_handler(Handler)

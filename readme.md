@@ -8,6 +8,8 @@ Plays music in your discord channel.
 cargo run --token YOUR_TOKEN
 ```
 
+Or you can set CRINGE_RADIO_TOKEN environment variable.
+
 ## Commands
 
 ```
