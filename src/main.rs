@@ -5,6 +5,7 @@ use serenity::framework::StandardFramework;
 use serenity::model::prelude::Message;
 use serenity::model::prelude::Ready;
 use serenity::model::prelude::ResumedEvent;
+use serenity::model::voice::VoiceState;
 use serenity::prelude::Context;
 use serenity::prelude::EventHandler;
 use serenity::prelude::GatewayIntents;
@@ -38,6 +39,69 @@ impl EventHandler for Handler {
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
         println!("Resumed");
+    }
+    
+    async fn voice_state_update(
+        &self,
+        ctx: Context,
+        old_state: Option<VoiceState>,
+        new_state: VoiceState,
+    ) {
+        let guild_id = match new_state.guild_id {
+            Some(guild_id) => guild_id,
+            None => return,
+        };
+
+        log::info!("guild_id: {:?}", guild_id);
+
+        let manager = match songbird::get(&ctx).await {
+            Some(manager) => manager,
+            None => return,
+        };
+
+        log::info!("manager found");
+
+        let call = match manager.get(guild_id) {
+            Some(call) => call,
+            None => return,
+        };
+
+        let mut call = call.lock().await;
+
+        log::info!("call found ({:?})", call);
+
+        let channel_id = match call.current_channel() {
+            Some(channel_id) => channel_id,
+            None => return,
+        };
+
+        log::info!("channel_id: {:?}", channel_id);
+
+        let channel_id = serenity::model::id::ChannelId(channel_id.0);
+
+        let channel = match ctx.cache.guild_channel(channel_id) {
+            Some(channel) => channel,
+            None => return,
+        };
+
+        let members = match channel.members(&ctx.cache).await {
+            Ok(members) => members,
+            Err(why) => {
+                log::error!("Error getting members: {:?}", why);
+                return;
+            }
+        };
+
+        log::info!("members count: {}", members.len());
+
+        if members.len() == 1 {
+            log::info!("there is only one member in the channel leaving the call");
+
+            match call.leave().await {
+                Ok(_) => log::info!("left the call"),
+                Err(why) => log::error!("Error leaving the call: {:?}", why),
+            }
+        }
     }
 }
 
