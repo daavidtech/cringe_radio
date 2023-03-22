@@ -1,5 +1,6 @@
 use args::Args;
 use clap::Parser;
+use openai::Openai;
 use serenity::Client;
 use serenity::framework::StandardFramework;
 use serenity::model::prelude::Message;
@@ -10,12 +11,22 @@ use serenity::prelude::Context;
 use serenity::prelude::EventHandler;
 use serenity::prelude::GatewayIntents;
 use songbird::SerenityInit;
+use youtube::Youtube;
+
+use crate::openai::ChatMessage;
+use crate::parser::parse_song_names_from_string;
 
 mod play;
 mod stop;
 mod args;
+mod youtube;
+mod openai;
+mod parser;
 
-struct Handler;
+struct Handler {
+    youtube: Youtube,
+    openai: Openai
+}
 
 #[async_trait::async_trait]
 impl EventHandler for Handler {
@@ -24,11 +35,62 @@ impl EventHandler for Handler {
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
-        println!("{}: {}", msg.author.name, msg.content);
+        let msg_content = msg.content.clone();
+
+        println!("{}: {}", msg.author.name, msg_content);
+
+        if msg.mentions_user_id(ctx.cache.current_user_id()) {
+            // Handle the message
+            println!("Bot mentioned in message: {}", msg_content);
+
+            let mut chat_messages: Vec<ChatMessage> = Vec::new();
+
+            let messages = msg.channel_id
+                .messages(&ctx, |ret| ret.limit(4)).await.unwrap();
+
+            for msg in messages.iter() {
+                let role = match msg.author.bot {
+                    true => "assistant",
+                    false => "user",
+                };
+
+                let chat_message = ChatMessage {
+                    role: role.to_string(),
+                    content: msg.content.clone(),
+                };
+
+                chat_messages.push(chat_message);
+            }
+
+            chat_messages.reverse();
+
+            let choice = self.openai.create_chat_completion(&chat_messages).await.unwrap();
+
+            log::info!("choice: {}", choice);
+
+            let songs = match parse_song_names_from_string(&choice) {
+                Ok(songs) => songs,
+                Err(err) => {
+                    log::error!("Error parsing song names: {:?}", err);
+
+                    vec![]
+                }
+            };
+
+            log::info!("songs: {:?}", songs);
+            
+            if songs.len() > 0 {
+                play::play(&ctx, &self.youtube, &self.openai, &msg, &songs[0]).await;
+            } else {
+                msg.channel_id.say(ctx, choice).await.unwrap();
+            }
+
+            return;
+        }
 
         if msg.content.starts_with("play") {
             println!("play command");
-            play::play(&ctx, &msg).await;
+            play::play(&ctx, &self.youtube, &self.openai, &msg, &msg.content).await;
         }
 
         if msg.content.starts_with("stop") {
@@ -119,13 +181,47 @@ async fn main() {
             t
         }
         Err(_) => {
-            match args.token {
+            match args.discord_apikey {
                 Some(t) => {
                     t
                 }
                 None => {
                     log::error!("No token provided");
                     return;
+                }
+            }
+        }
+    };
+
+    println!("discord token: {}", token);
+
+    let openai_apikey = match std::env::var("OPENAI_APIKEY") {
+        Ok(t) => {
+            t
+        }
+        Err(_) => {
+            match args.openai_apikey {
+                Some(t) => {
+                    t
+                }
+                None => {
+                    "".to_string()
+                }
+            }
+        }
+    };
+
+    let youtube_apikey = match std::env::var("YOUTUBE_APIKEY") {
+        Ok(t) => {
+            t
+        }
+        Err(_) => {
+            match args.youtube_apikey {
+                Some(t) => {
+                    t
+                }
+                None => {
+                    "".to_string()
                 }
             }
         }
@@ -139,10 +235,16 @@ async fn main() {
 
         let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
 
+        let youtube = Youtube::new(&youtube_apikey);
+        let openai = Openai::new(&openai_apikey);
+
         let mut client = match Client::builder(&token, intents)
             .framework(framework)
             .register_songbird()
-            .event_handler(Handler)
+            .event_handler(Handler {
+                youtube: youtube,
+                openai: openai
+            })
             .await {
             Ok(client) => client,
             Err(why) => {

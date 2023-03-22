@@ -2,21 +2,62 @@ use serenity::model::prelude::*;
 use serenity::prelude::Context;
 use url::Url;
 
+use crate::openai::Openai;
+use crate::youtube::Youtube;
 
-pub async fn play(ctx: &Context, msg: &Message) {
-    let url = msg.content.replace("play", "").trim().to_string();
 
-    let url = match Url::parse(&url) {
+pub async fn play(
+    ctx: &Context, 
+    youtube: &Youtube, 
+    openai: &Openai, 
+    msg: &Message, 
+    query: &str
+) {
+    let query = query.replace("play", "").trim().to_string();
+
+    log::info!("play query {}", query);
+
+    let url = match Url::parse(&query) {
         Ok(url) => url,
         Err(why) => {
             log::error!("Error parsing url: {:?}", why);
             
-            match msg.reply(ctx, "Nigga please write correct url").await {
-                Ok(_) => {},
-                Err(why) => log::error!("Error sending message: {:?}", why),
+
+            let res = match youtube.search(&query).await {
+                Ok(r) => r,
+                Err(err) => {
+                    log::error!("Error searching youtube: {:?}", err);
+
+                    msg.reply(ctx, "Song not found").await;
+
+                    return;
+                },
+            };
+
+            if res.len() == 0 {
+                log::error!("No results");
+
+                msg.reply(ctx, "Song not found").await;
+
+                return;
             }
+
+            let first_res = &res[0];
+
+            let url = match youtube.get_video_watch_url(&first_res.id).await {
+                Ok(u) => u,
+                Err(err) => {
+                    log::error!("Error while getting video url {:?}", err);
+
+                    msg.reply(ctx, "Song not found").await;
+
+                    return;
+                }
+            };
+
+            msg.channel_id.say(ctx, format!("Playing {} url {}", first_res.title, url)).await.unwrap();
             
-            return;
+            Url::parse(&url).unwrap()
         }
     };
 

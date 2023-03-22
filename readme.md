@@ -10,6 +10,17 @@ cargo run --token YOUR_TOKEN
 
 Or you can set CRINGE_RADIO_TOKEN environment variable.
 
+## environment variables
+
+```env
+# discord bot token
+CRINGE_RADIO_TOKEN
+# youtube api key
+YOUTUBE_APIKEY
+# openai api key
+OPENAI_APIKEY
+```
+
 ## Commands
 
 ```
