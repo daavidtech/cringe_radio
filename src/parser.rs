@@ -1,30 +1,14 @@
-use anyhow::Error;
-use anyhow::Result;
-use anyhow::anyhow;
-use serde_json::Value;
+use regex::Regex;
+use std::collections::HashMap;
 
-
-pub fn parse_song_names_from_string(input: &str) -> Result<Vec<String>, Error> {
-    // Extract JSON string from the input
-    let json_start = input.find("{").ok_or_else(|| anyhow!("Could not find JSON start"))?;
-    let json_end = input.rfind("}").ok_or_else(|| anyhow!("Could not find JSON end"))?;
-    let json_str = &input[json_start..=json_end];
-
-    // Parse JSON into a Value
-    let json_value: Value = serde_json::from_str(json_str)?;
-
-    // Extract the song names
-    let songs = json_value["songs"].as_array().ok_or_else(|| anyhow!("Could not find songs array"))?;
-    let mut song_names = Vec::new();
-    for song in songs {
-        let song_name = song["name"]
-            .as_str()
-            .ok_or_else(|| anyhow!("Could not find song name as string"))?
-            .to_string();
-        song_names.push(song_name);
-    }
-
-    Ok(song_names)
+pub fn parse_songs_from_string(input: &str) -> (Vec<String>, String) {
+    let re = Regex::new(r"<SONG>(.*?)</SONG>").unwrap();
+    let songs: Vec<String> = re
+        .captures_iter(input)
+        .map(|cap| cap[1].to_string())
+        .collect();
+    let modified_text = re.replace_all(input, "$1").to_string();
+    (songs, modified_text)
 }
 
 #[cfg(test)]
@@ -32,56 +16,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parser() {
-        let str = r#"
-Sure here is song names:
+    fn test_parse_songs_from_string() {
+        let input = "Here's a song that might help you feel less lonely:\n\n<SONG>Maroon 5 - Memories</SONG>\n\nCongratulations on coming out! Here are a few songs that celebrate love and LGBTQ+ pride:\n\n<SONG>Madonna - Vogue</SONG>\n<SONG>Lady Gaga - Born This Way</SONG>\n<SONG>Frank Ocean - Thinkin Bout You</SONG>";
+        let (songs, modified_text) = parse_songs_from_string(input);
 
-```
-{
-    "songs":  [
-        {
-            "name":  "despacito"
-        }
-    ]
-}
-```"#;
+        assert_eq!(songs, vec![
+            "Maroon 5 - Memories",
+            "Madonna - Vogue",
+            "Lady Gaga - Born This Way",
+            "Frank Ocean - Thinkin Bout You",
+        ]);
 
-        let song_names = parse_song_names_from_string(str).unwrap();
-
-        assert_eq!(song_names.len(), 1);
-        assert_eq!(song_names[0], "despacito");
-    }
-
-    #[test]
-    fn test_parser2() {
-        let str = r#"
-Sure here is song names:
-
-{
-    "songs":  [
-        {
-            "name":  "despacito"
-        }
-    ]
-}"#;
-
-        let song_names = parse_song_names_from_string(str).unwrap();
-
-        assert_eq!(song_names.len(), 1);
-        assert_eq!(song_names[0], "despacito");
-    }
-
-    #[test]
-    fn test_parser3() {
-        let str = r#"
-Sure thing! Here's Eminem's "Lose Yourself". Enjoy!
-
-https://www.youtube.com/watch?v=_Yhyp-_hX2s
-"#;
-            
-        let song_names = parse_song_names_from_string(str).unwrap();
-
-        assert_eq!(song_names.len(), 1);
-        assert_eq!(song_names[0], "https://www.youtube.com/watch?v=_Yhyp-_hX2s");
+        let expected_modified_text = "Here's a song that might help you feel less lonely:\n\nMaroon 5 - Memories\n\nCongratulations on coming out! Here are a few songs that celebrate love and LGBTQ+ pride:\n\nMadonna - Vogue\nLady Gaga - Born This Way\nFrank Ocean - Thinkin Bout You";
+        assert_eq!(modified_text, expected_modified_text);
     }
 }

@@ -22,7 +22,7 @@ pub struct SearchResult {
     pub thumbnail_url: String,
 }
 
-async fn search_youtube(query: &str, api_key: &str) -> Result<Vec<SearchResult>, reqwest::Error> {
+async fn search_youtube(query: &str, api_key: &str) -> anyhow::Result<Vec<SearchResult>> {
     let url = format!(
         "https://www.googleapis.com/youtube/v3/search?part=snippet&q={}&key={}&maxResults=10&type=video",
         query,
@@ -54,7 +54,7 @@ impl Youtube {
         }
     }
 
-    pub async fn search(&self, query: &str) -> Result<Vec<SearchResult>, reqwest::Error> {
+    pub async fn search(&self, query: &str) -> anyhow::Result<Vec<SearchResult>> {
         search_youtube(query, &self.api_key).await
     }
 

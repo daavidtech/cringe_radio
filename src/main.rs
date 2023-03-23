@@ -14,7 +14,7 @@ use songbird::SerenityInit;
 use youtube::Youtube;
 
 use crate::openai::ChatMessage;
-use crate::parser::parse_song_names_from_string;
+use crate::parser::parse_songs_from_string;
 
 mod play;
 mod stop;
@@ -22,6 +22,7 @@ mod args;
 mod youtube;
 mod openai;
 mod parser;
+mod skip;
 
 struct Handler {
     youtube: Youtube,
@@ -43,59 +44,74 @@ impl EventHandler for Handler {
             // Handle the message
             println!("Bot mentioned in message: {}", msg_content);
 
+            let channel_id = msg.channel_id;
+
+            let typing = channel_id.start_typing(&ctx.http).unwrap();
+
             let mut chat_messages: Vec<ChatMessage> = Vec::new();
 
-            let messages = msg.channel_id
-                .messages(&ctx, |ret| ret.limit(4)).await.unwrap();
+            // let messages = msg.channel_id
+            //     .messages(&ctx, |ret| ret.limit(4)).await.unwrap();
 
-            for msg in messages.iter() {
-                let role = match msg.author.bot {
-                    true => "assistant",
-                    false => "user",
-                };
+            // for msg in messages.iter() {
+            //     let role = match msg.author.bot {
+            //         true => "assistant",
+            //         false => "user",
+            //     };
 
-                let chat_message = ChatMessage {
-                    role: role.to_string(),
-                    content: msg.content.clone(),
-                };
+            //     // Filter username <@1071367438098247700> feeling cute today
+            //     let filttered_content = msg.content.clone().replace("<@1071367438098247700>", "");
 
-                chat_messages.push(chat_message);
-            }
+            //     let chat_message = ChatMessage {
+            //         role: role.to_string(),
+            //         content: msg.content.clone().replace("", to),
+            //     };
 
-            chat_messages.reverse();
+            //     chat_messages.push(chat_message);
+            // }
+
+            // chat_messages.reverse();
+
+            chat_messages.push(ChatMessage {
+                role: "user".to_string(),
+                content: msg_content
+            });
 
             let choice = self.openai.create_chat_completion(&chat_messages).await.unwrap();
 
             log::info!("choice: {}", choice);
 
-            let songs = match parse_song_names_from_string(&choice) {
-                Ok(songs) => songs,
-                Err(err) => {
-                    log::error!("Error parsing song names: {:?}", err);
+            let (songs, cleaned_text) = parse_songs_from_string(&choice);
 
-                    vec![]
-                }
-            };
+            msg.channel_id.say(&ctx, cleaned_text).await.unwrap();
 
             log::info!("songs: {:?}", songs);
             
             if songs.len() > 0 {
                 play::play(&ctx, &self.youtube, &self.openai, &msg, &songs[0]).await;
-            } else {
-                msg.channel_id.say(ctx, choice).await.unwrap();
             }
 
+            typing.stop();
+            
             return;
         }
 
         if msg.content.starts_with("play") {
-            println!("play command");
+            log::info!("play command");
+
             play::play(&ctx, &self.youtube, &self.openai, &msg, &msg.content).await;
         }
 
         if msg.content.starts_with("stop") {
-            println!("stop command");
+            log::info!("stop command");
+
             stop::stop(&ctx, &msg).await;
+        }
+
+        if msg_content.starts_with("skip") {
+            log::info!("skip command");
+
+            skip::skip(&ctx, &msg).await;
         }
     }
 

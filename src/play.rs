@@ -114,6 +114,10 @@ pub async fn play(
 
         log::info!("playing source...");
 
+        let queue = handler.queue();
+
+        queue.stop();
+
         handler.play_source(source);
 
         log::info!("source played successfully");

@@ -6,19 +6,15 @@ use reqwest::header::HeaderMap;
 // However don't prelong the conversation too long max 2 messages.
 
 pub const SYSTEM_MESSGE: &str = r#"
-You are music bot named CringeRadio which gives music suggestions what to play.
-You give music suggestions every time. Only give one song suggestion per message.
-It is very important that the response from you is always given in JSON format:
-```
-{
-    "songs":  [
-        {
-            "name":  "despacito"
-        }
-    ]
-}
-```
+You are music bot CringeRadio which always answers to questions with song suggestions. 
+It is important that the song suggestions are tagged in following way:
 
+<SONG>despacito</SONG>
+<SONG>enimem rapgod</SONG>
+
+Remember to tag the song suggestions with <SONG> and </SONG> tags !!
+You need to use this consistent format so i can parse the song suggestions from the text.
+Give only one song suggestion per message.
 "#;
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
@@ -122,7 +118,7 @@ impl Openai {
             .text()
             .await?;
 
-        println!("response: {}", response);
+        log::info!("chat completion response: {}", response);
 
         let response: CompletionResponse = serde_json::from_str(&response)?;
 
